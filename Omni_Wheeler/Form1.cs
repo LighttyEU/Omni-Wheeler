@@ -1,148 +1,292 @@
+using Omni_Wheeler;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Text;
+using System.Windows.Forms;
 
 namespace Omni_Wheeler
 {
-    public partial class Form1 : Form
+
+  public partial class MainForm : Form
+  {
+    System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
+
+    List<PointF> path;
+    Vehicle vehicle;
+
+    public MainForm()
     {
-        Bitmap streckenBild;
-        int aktKurs = 1;
-        float StrBreite = 69f;
+      DoubleBuffered = true;
+      Width = 900;
+      Height = 700;
+      BackColor = Color.Black;
 
-        public class Strasse
-        {
-            public List<PointF> Mitte = new List<PointF>();
-            public List<PointF> Links = new List<PointF>();
-            public List<PointF> Rechts = new List<PointF>();
-        }
+      path = CreateRaceTrack();
 
-        public Form1()
-        {
-            InitializeComponent();
-            ZeichneKurs();
-        }
+      vehicle = new Vehicle(150, 400);
 
-        private void btnKurs1_Click(object sender, EventArgs e)
-        {
-            aktKurs = 1;
-            ZeichneKurs();
-        }
-
-        private void btnKurs2_Click(object sender, EventArgs e)
-        {
-            aktKurs = 2;
-            ZeichneKurs();
-        }
-
-        private void ZeichneKurs()
-        {
-            if (streckenBild != null)
-            {
-                streckenBild.Dispose();
-            }
-
-            streckenBild = new Bitmap(picStrecke.Width, picStrecke.Height);
-
-            Graphics g = Graphics.FromImage(streckenBild);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.Clear(Color.White);
-
-
-            List<PointF> mLinie = GetmLinie();
-            Strasse strasse = ErzStr(mLinie, StrBreite);
-            ZeichStr(g, strasse);
-
-            g.Dispose();
-
-            picStrecke.Image = streckenBild;
-        }
-
-        private List<PointF> GetmLinie()
-        {
-            if (aktKurs == 1)
-            {
-                return K1Punkte();
-            }
-
-            return K2Punkte();
-        }
-
-        private List<PointF> K1Punkte()
-        {
-            return new List<PointF>()
-            {
-                new Point(50, 250),
-                new Point(150, 250),
-                new Point(250, 200),
-                new Point(350, 150),
-                new Point(500, 150)
-            };
-        }
-
-        private List<PointF> K2Punkte()
-        {
-            return new List<PointF>()
-            {
-                new Point(50, 200),
-                new Point(150, 100),
-                new Point(250, 250),
-                new Point(350, 100),
-                new Point(500, 200)
-            };
-        }
-
-        private Strasse ErzStr(List<PointF> mLinie, float breite)
-        {
-            Strasse strasse = new Strasse();
-            for (int i = 0; i < mLinie.Count - 1; i++)
-            {
-                PointF p1 = mLinie[i];
-                PointF p2 = mLinie[i + 1];
-                strasse.Mitte.Add(p1);
-                strasse.Mitte.Add(p2);
-                float dx = p2.X - p1.X;
-                float dy = p2.Y - p1.Y;
-                float length = (float)Math.Sqrt(dx * dx + dy * dy);
-                float X = -dy / length * breite / 2;
-                float Y = dx / length * breite / 2;
-                strasse.Links.Add(new PointF(p1.X + X, p1.Y + Y));
-                strasse.Links.Add(new PointF(p2.X + X, p2.Y + Y));
-                strasse.Rechts.Add(new PointF(p1.X - X, p1.Y - Y));
-                strasse.Rechts.Add(new PointF(p2.X - X, p2.Y - Y));
-            }
-            return strasse;
-        }
-
-        private void ZeichStr(Graphics g, Strasse strasse)
-        {
-            for (int i = 0; i < strasse.Mitte.Count - 1; i += 2)
-            {
-                PointF p1 = strasse.Mitte[i];
-                PointF p2 = strasse.Mitte[i + 1];
-                g.DrawLine(Pens.Gray, p1, p2);
-            }
-            for (int i = 0; i < strasse.Links.Count - 1; i += 2)
-            {
-                PointF p1 = strasse.Links[i];
-                PointF p2 = strasse.Links[i + 1];
-                g.DrawLine(Pens.Black, p1, p2);
-            }
-            for (int i = 0; i < strasse.Rechts.Count - 1; i += 2)
-            {
-                PointF p1 = strasse.Rechts[i];
-                PointF p2 = strasse.Rechts[i + 1];
-                g.DrawLine(Pens.Black, p1, p2);
-            }
-        }
-
-
-
-
+      timer.Interval = 10;
+      timer.Tick += Update;
+      timer.Start();
     }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+      if (keyData == Keys.D1) vehicle.mode = DriveMode.Car;
+      if (keyData == Keys.D2) vehicle.mode = DriveMode.Sideways;
+      if (keyData == Keys.D3) vehicle.mode = DriveMode.Rotate;
+
+      return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private void Update(object sender, EventArgs e)
+    {
+      vehicle.FollowPath(path);
+      vehicle.Update(0.01f);
+
+      Invalidate();
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+      var g = e.Graphics;
+
+      // Strecke zeichnen
+      for (int i = 0; i < path.Count - 1; i++)
+        g.DrawLine(Pens.White, path[i], path[i + 1]);
+
+      vehicle.Draw(g);
+
+      // HUD
+      g.DrawString("1=Auto | 2=Omni | 3=Rotate",
+          new Font("Arial", 12),
+          Brushes.White,
+          10, 10);
+    }
+
+    // ===================== STRECKE =====================
+
+    List<PointF> CreateRaceTrack()
+    {
+      List<PointF> path = new List<PointF>();
+      float spacing = 10f;  //Anzahl der Punkte in einer Linie oder Kurve => je größer, desto genauer, aber desto mehr Rechenaufwand
+
+      AddLine(path, new PointF(150, 400), new PointF(650, 400), spacing);
+      AddArc(path, new PointF(650, 300), 100, 90, -90, spacing);
+      AddLine(path, new PointF(650, 200), new PointF(650, 100), spacing);
+      AddArc(path, new PointF(400, 100), 250, 0, 180, spacing);
+      AddLine(path, new PointF(150, 100), new PointF(150, 300), spacing);
+      AddArc(path, new PointF(150, 300), 100, 180, 360, spacing);
+
+      return path;
+    }
+
+    void AddLine(List<PointF> path, PointF start, PointF end, float spacing)
+    {
+      float dx = end.X - start.X;
+      float dy = end.Y - start.Y;
+
+      float length = (float)Math.Sqrt(dx * dx + dy * dy);
+      int steps = (int)(length / spacing);
+
+      for (int i = 0; i <= steps; i++)
+      {
+        float t = (float)i / steps;
+
+        float x = start.X + t * dx;
+        float y = start.Y + t * dy;
+
+        path.Add(new PointF(x, y));
+      }
+    }
+
+    void AddArc(List<PointF> path, PointF center, float radius, float startDeg, float endDeg, float spacing)
+    {
+      float startRad = startDeg * (float)Math.PI / 180f;
+      float endRad = endDeg * (float)Math.PI / 180f;
+
+      float arcLength = Math.Abs(endRad - startRad) * radius;
+      int steps = (int)(arcLength / spacing);
+
+      for (int i = 0; i <= steps; i++)
+      {
+        float t = (float)i / steps;
+        float angle = startRad + t * (endRad - startRad);
+
+        float x = center.X + radius * (float)Math.Cos(angle);
+        float y = center.Y + radius * (float)Math.Sin(angle);
+
+        path.Add(new PointF(x, y));
+      }
+    }
+  }
+
+  // ===================== FAHRZEUG =====================
+
+  public enum DriveMode
+  {
+    Car,
+    Sideways,
+    Rotate
+  }
+
+  public class Vehicle
+  {
+    public PointF position;
+    public float angle = 0;
+
+    float size = 40;
+
+    public DriveMode mode = DriveMode.Car;
+
+    // Geschwindigkeiten
+    float vx, vy, omega;
+
+    // Auto-Modus
+    float v = 80f;
+    float L = 40f;
+    float delta = 0f;
+
+    public Vehicle(float x, float y)
+    {
+      position = new PointF(x, y);
+    }
+
+    public void FollowPath(List<PointF> path)
+    {
+      int closestIndex = GetClosestIndex(path);
+      int lookIndex = Math.Min(closestIndex + 3, path.Count - 1); //vergleichts nächsten Punkt mit Letzten
+
+      PointF target = path[lookIndex];
+
+      float dx = target.X - position.X;
+      float dy = target.Y - position.Y;
+
+      float targetAngle = (float)Math.Atan2(dy, dx); //Atan2, weil genauer als atan
+      float alpha = NormalizeAngle(targetAngle - angle);
+      float distance = (float)Math.Sqrt(dx * dx + dy * dy);
+
+      switch (mode)
+      {
+        case DriveMode.Car:
+          CarMode(alpha, distance);
+          break;
+
+        case DriveMode.Sideways:
+          SidewaysMode(dx, dy);
+          break;
+
+        case DriveMode.Rotate:
+          RotateMode(alpha);
+          break;
+      }
+    }
+
+    void CarMode(float alpha, float distance)
+    {
+      delta = (float)Math.Atan2(2 * L * Math.Sin(alpha), distance);
+
+      vx = v;
+      vy = 0;
+      omega = (v / L) * (float)Math.Tan(delta);
+    }
+
+    void SidewaysMode(float dx, float dy)
+    {
+      float cos = (float)Math.Cos(-angle); //angle negativ, weil world -> auto
+      float sin = (float)Math.Sin(-angle);
+
+      float localX = dx * cos - dy * sin;
+      float localY = dx * sin + dy * cos;
+
+      float k = 2.0f;
+
+      vx = localX * k;
+      vy = localY * k;
+      omega = 0;
+    }
+
+    void RotateMode(float alpha)
+    {
+      vx = 0;
+      vy = 0;
+
+      float kRot = 3.0f;
+      omega = alpha * kRot;
+    }
+
+    public void Update(float dt)
+    {
+      float cos = (float)Math.Cos(angle);
+      float sin = (float)Math.Sin(angle);
+
+      position.X += (vx * cos - vy * sin) * dt;
+      position.Y += (vx * sin + vy * cos) * dt;
+
+      angle += omega * dt;
+    }
+
+    public void Draw(Graphics g)
+    {
+      var corners = GetCorners();
+
+      g.DrawPolygon(Pens.Red, corners.ToArray());
+
+      foreach (var c in corners)
+        g.FillEllipse(Brushes.Yellow, c.X - 4, c.Y - 4, 8, 8);
+    }
+
+    private List<PointF> GetCorners()
+    {
+      float h = size / 2;
+
+      var local = new List<PointF>()
+            {
+                new PointF(-h, -h),
+                new PointF(h, -h),
+                new PointF(h, h),
+                new PointF(-h, h)
+            };
+
+      var world = new List<PointF>();
+
+      foreach (var p in local)
+      {
+        float x = (float)(p.X * Math.Cos(angle) - p.Y * Math.Sin(angle)); // angle positive weil auto -> world
+        float y = (float)(p.X * Math.Sin(angle) + p.Y * Math.Cos(angle));
+
+        world.Add(new PointF(position.X + x, position.Y + y));
+      }
+
+      return world;
+    }
+
+    private int GetClosestIndex(List<PointF> path)
+    {
+      float minDist = float.MaxValue;
+      int index = 0;
+
+      for (int i = 0; i < path.Count; i++)
+      {
+        float dx = path[i].X - position.X;
+        float dy = path[i].Y - position.Y;
+        float d = dx * dx + dy * dy;
+
+        if (d < minDist)
+        {
+          minDist = d;
+          index = i;
+        }
+      }
+
+      return index;
+    }
+
+    private float NormalizeAngle(float a)
+    {
+      while (a > Math.PI) a -= 2 * (float)Math.PI;
+      while (a < -Math.PI) a += 2 * (float)Math.PI;
+      return a;
+    }
+  }
 }
