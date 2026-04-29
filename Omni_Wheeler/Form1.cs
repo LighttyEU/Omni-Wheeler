@@ -7,240 +7,209 @@ using System.Windows.Forms;
 namespace Omni_Wheeler
 {
 
-  public partial class MainForm : Form
-  {
-    System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
-
-    List<PointF> path;
-    Vehicle vehicle;
-
-    public MainForm()
+    public partial class MainForm : Form
     {
-      DoubleBuffered = true;
-      Width = 900;
-      Height = 700;
-      BackColor = Color.Black;
+        System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
 
-      path = CreateRaceTrack();
+        List<PointF> path;
+        Vehicle vehicle;
 
-      vehicle = new Vehicle(150, 400);
+        public MainForm()
+        {
+            DoubleBuffered = true;
+            Width = 900;
+            Height = 700;
+            BackColor = Color.Black;
 
-      timer.Interval = 10;
-      timer.Tick += Update;
-      timer.Start();
-    }
+            path = RaceTrack.CreateSimpleTrack();
 
-    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-    {
-      if (keyData == Keys.D1) vehicle.mode = DriveMode.Car;
-      if (keyData == Keys.D2) vehicle.mode = DriveMode.Sideways;
-      if (keyData == Keys.D3) vehicle.mode = DriveMode.Rotate;
 
-      return base.ProcessCmdKey(ref msg, keyData);
-    }
+            vehicle = new Vehicle(150, 400);
 
-    private void Update(object sender, EventArgs e)
-    {
-      vehicle.FollowPath(path);
-      vehicle.Update(0.01f);
+            timer.Interval = 10;
+            timer.Tick += Update;
+            timer.Start();
+        }
+        private void SetTrack(List<PointF> newPath)
+        {
+            path = newPath;
 
-      Invalidate();
-    }
+            if (path.Count > 0)
+            {
+                PointF start = path[0];
+                vehicle = new Vehicle(start.X, start.Y);
+            }
 
-    protected override void OnPaint(PaintEventArgs e)
-    {
-      var g = e.Graphics;
+            Invalidate();
+        }
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.D1)
+                vehicle.mode = DriveMode.Car;
 
-      // Strecke zeichnen
-      for (int i = 0; i < path.Count - 1; i++)
-        g.DrawLine(Pens.White, path[i], path[i + 1]);
+            if (keyData == Keys.D2)
+                vehicle.mode = DriveMode.Sideways;
 
-      vehicle.Draw(g);
+            if (keyData == Keys.D3)
+                vehicle.mode = DriveMode.Rotate;
 
-      // HUD
-      g.DrawString("1=Auto | 2=Omni | 3=Rotate",
-          new Font("Arial", 12),
-          Brushes.White,
-          10, 10);
-    }
+            if (keyData == Keys.D4)
+            {
+                SetTrack(RaceTrack.CreateSimpleTrack());
+            }
 
-    // ===================== STRECKE =====================
+            if (keyData == Keys.D5)
+            {
+                SetTrack(RaceTrack.CreateRaceTrackStyle());
+            }
 
-    List<PointF> CreateRaceTrack()
-    {
-      List<PointF> path = new List<PointF>();
-      float spacing = 10f;  //Anzahl der Punkte in einer Linie oder Kurve => je größer, desto genauer, aber desto mehr Rechenaufwand
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
 
-      AddLine(path, new PointF(150, 400), new PointF(650, 400), spacing);
-      AddArc(path, new PointF(650, 300), 100, 90, -90, spacing);
-      AddLine(path, new PointF(650, 200), new PointF(650, 100), spacing);
-      AddArc(path, new PointF(400, 100), 250, 0, 180, spacing);
-      AddLine(path, new PointF(150, 100), new PointF(150, 300), spacing);
-      AddArc(path, new PointF(150, 300), 100, 180, 360, spacing);
+        private void Update(object sender, EventArgs e)
+        {
+            vehicle.FollowPath(path);
+            vehicle.Update(0.01f);
 
-      return path;
-    }
+            Invalidate();
+        }
 
-    void AddLine(List<PointF> path, PointF start, PointF end, float spacing)
-    {
-      float dx = end.X - start.X;
-      float dy = end.Y - start.Y;
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
 
-      float length = (float)Math.Sqrt(dx * dx + dy * dy);
-      int steps = (int)(length / spacing);
+            // Strecke zeichnen
+            for (int i = 0; i < path.Count - 1; i++)
+                g.DrawLine(Pens.White, path[i], path[i + 1]);
 
-      for (int i = 0; i <= steps; i++)
-      {
-        float t = (float)i / steps;
+            vehicle.Draw(g);
 
-        float x = start.X + t * dx;
-        float y = start.Y + t * dy;
+            // HUD
+            g.DrawString("1=Auto | 2=Omni | 3=Rotate | 4=Simple | 5=Race", new Font("Arial", 12), Brushes.White, 10, 10);
+        }
 
-        path.Add(new PointF(x, y));
-      }
-    }
 
-    void AddArc(List<PointF> path, PointF center, float radius, float startDeg, float endDeg, float spacing)
-    {
-      float startRad = startDeg * (float)Math.PI / 180f;
-      float endRad = endDeg * (float)Math.PI / 180f;
 
-      float arcLength = Math.Abs(endRad - startRad) * radius;
-      int steps = (int)(arcLength / spacing);
+        // ===================== FAHRZEUG =====================
 
-      for (int i = 0; i <= steps; i++)
-      {
-        float t = (float)i / steps;
-        float angle = startRad + t * (endRad - startRad);
+        public enum DriveMode
+        {
+            Car,
+            Sideways,
+            Rotate
+        }
 
-        float x = center.X + radius * (float)Math.Cos(angle);
-        float y = center.Y + radius * (float)Math.Sin(angle);
+        public class Vehicle
+        {
+            public PointF position;
+            public float angle = 0;
 
-        path.Add(new PointF(x, y));
-      }
-    }
-  }
+            float size = 40;
 
-  // ===================== FAHRZEUG =====================
+            public DriveMode mode = DriveMode.Car;
 
-  public enum DriveMode
-  {
-    Car,
-    Sideways,
-    Rotate
-  }
+            // Geschwindigkeiten
+            float vx, vy, omega;
 
-  public class Vehicle
-  {
-    public PointF position;
-    public float angle = 0;
+            // Auto-Modus
+            float v = 80f;
+            float L = 40f;
+            float delta = 0f;
 
-    float size = 40;
+            public Vehicle(float x, float y)
+            {
+                position = new PointF(x, y);
+            }
 
-    public DriveMode mode = DriveMode.Car;
+            public void FollowPath(List<PointF> path)
+            {
+                int closestIndex = GetClosestIndex(path);
+                int lookIndex = Math.Min(closestIndex + 3, path.Count - 1); //vergleichts nächsten Punkt mit Letzten
 
-    // Geschwindigkeiten
-    float vx, vy, omega;
+                PointF target = path[lookIndex];
 
-    // Auto-Modus
-    float v = 80f;
-    float L = 40f;
-    float delta = 0f;
+                float dx = target.X - position.X;
+                float dy = target.Y - position.Y;
 
-    public Vehicle(float x, float y)
-    {
-      position = new PointF(x, y);
-    }
+                float targetAngle = (float)Math.Atan2(dy, dx); //Atan2, weil genauer als atan
+                float alpha = NormalizeAngle(targetAngle - angle);
+                float distance = (float)Math.Sqrt(dx * dx + dy * dy);
 
-    public void FollowPath(List<PointF> path)
-    {
-      int closestIndex = GetClosestIndex(path);
-      int lookIndex = Math.Min(closestIndex + 3, path.Count - 1); //vergleichts nächsten Punkt mit Letzten
+                switch (mode)
+                {
+                    case DriveMode.Car:
+                        CarMode(alpha, distance);
+                        break;
 
-      PointF target = path[lookIndex];
+                    case DriveMode.Sideways:
+                        SidewaysMode(dx, dy);
+                        break;
 
-      float dx = target.X - position.X;
-      float dy = target.Y - position.Y;
+                    case DriveMode.Rotate:
+                        RotateMode(alpha);
+                        break;
+                }
+            }
 
-      float targetAngle = (float)Math.Atan2(dy, dx); //Atan2, weil genauer als atan
-      float alpha = NormalizeAngle(targetAngle - angle);
-      float distance = (float)Math.Sqrt(dx * dx + dy * dy);
+            void CarMode(float alpha, float distance)
+            {
+                delta = (float)Math.Atan2(2 * L * Math.Sin(alpha), distance);
 
-      switch (mode)
-      {
-        case DriveMode.Car:
-          CarMode(alpha, distance);
-          break;
+                vx = v;
+                vy = 0;
+                omega = (v / L) * (float)Math.Tan(delta);
+            }
 
-        case DriveMode.Sideways:
-          SidewaysMode(dx, dy);
-          break;
+            void SidewaysMode(float dx, float dy)
+            {
+                float cos = (float)Math.Cos(-angle); //angle negativ, weil world -> auto
+                float sin = (float)Math.Sin(-angle);
 
-        case DriveMode.Rotate:
-          RotateMode(alpha);
-          break;
-      }
-    }
+                float localX = dx * cos - dy * sin;
+                float localY = dx * sin + dy * cos;
 
-    void CarMode(float alpha, float distance)
-    {
-      delta = (float)Math.Atan2(2 * L * Math.Sin(alpha), distance);
+                float k = 2.0f;
 
-      vx = v;
-      vy = 0;
-      omega = (v / L) * (float)Math.Tan(delta);
-    }
+                vx = localX * k;
+                vy = localY * k;
+                omega = 0;
+            }
 
-    void SidewaysMode(float dx, float dy)
-    {
-      float cos = (float)Math.Cos(-angle); //angle negativ, weil world -> auto
-      float sin = (float)Math.Sin(-angle);
+            void RotateMode(float alpha)
+            {
+                vx = 0;
+                vy = 0;
 
-      float localX = dx * cos - dy * sin;
-      float localY = dx * sin + dy * cos;
+                float kRot = 3.0f;
+                omega = alpha * kRot;
+            }
 
-      float k = 2.0f;
+            public void Update(float dt)
+            {
+                float cos = (float)Math.Cos(angle);
+                float sin = (float)Math.Sin(angle);
 
-      vx = localX * k;
-      vy = localY * k;
-      omega = 0;
-    }
+                position.X += (vx * cos - vy * sin) * dt;
+                position.Y += (vx * sin + vy * cos) * dt;
 
-    void RotateMode(float alpha)
-    {
-      vx = 0;
-      vy = 0;
+                angle += omega * dt;
+            }
 
-      float kRot = 3.0f;
-      omega = alpha * kRot;
-    }
+            public void Draw(Graphics g)
+            {
+                var corners = GetCorners();
 
-    public void Update(float dt)
-    {
-      float cos = (float)Math.Cos(angle);
-      float sin = (float)Math.Sin(angle);
+                g.DrawPolygon(Pens.Red, corners.ToArray());
 
-      position.X += (vx * cos - vy * sin) * dt;
-      position.Y += (vx * sin + vy * cos) * dt;
+                foreach (var c in corners)
+                    g.FillEllipse(Brushes.Yellow, c.X - 4, c.Y - 4, 8, 8);
+            }
 
-      angle += omega * dt;
-    }
+            private List<PointF> GetCorners()
+            {
+                float h = size / 2;
 
-    public void Draw(Graphics g)
-    {
-      var corners = GetCorners();
-
-      g.DrawPolygon(Pens.Red, corners.ToArray());
-
-      foreach (var c in corners)
-        g.FillEllipse(Brushes.Yellow, c.X - 4, c.Y - 4, 8, 8);
-    }
-
-    private List<PointF> GetCorners()
-    {
-      float h = size / 2;
-
-      var local = new List<PointF>()
+                var local = new List<PointF>()
             {
                 new PointF(-h, -h),
                 new PointF(h, -h),
@@ -248,45 +217,46 @@ namespace Omni_Wheeler
                 new PointF(-h, h)
             };
 
-      var world = new List<PointF>();
+                var world = new List<PointF>();
 
-      foreach (var p in local)
-      {
-        float x = (float)(p.X * Math.Cos(angle) - p.Y * Math.Sin(angle)); // angle positive weil auto -> world
-        float y = (float)(p.X * Math.Sin(angle) + p.Y * Math.Cos(angle));
+                foreach (var p in local)
+                {
+                    float x = (float)(p.X * Math.Cos(angle) - p.Y * Math.Sin(angle)); // angle positive weil auto -> world
+                    float y = (float)(p.X * Math.Sin(angle) + p.Y * Math.Cos(angle));
 
-        world.Add(new PointF(position.X + x, position.Y + y));
-      }
+                    world.Add(new PointF(position.X + x, position.Y + y));
+                }
 
-      return world;
-    }
+                return world;
+            }
 
-    private int GetClosestIndex(List<PointF> path)
-    {
-      float minDist = float.MaxValue;
-      int index = 0;
+            private int GetClosestIndex(List<PointF> path)
+            {
+                float minDist = float.MaxValue;
+                int index = 0;
 
-      for (int i = 0; i < path.Count; i++)
-      {
-        float dx = path[i].X - position.X;
-        float dy = path[i].Y - position.Y;
-        float d = dx * dx + dy * dy;
+                for (int i = 0; i < path.Count; i++)
+                {
+                    float dx = path[i].X - position.X;
+                    float dy = path[i].Y - position.Y;
+                    float d = dx * dx + dy * dy;
 
-        if (d < minDist)
-        {
-          minDist = d;
-          index = i;
+                    if (d < minDist)
+                    {
+                        minDist = d;
+                        index = i;
+                    }
+                }
+
+                return index;
+            }
+
+            private float NormalizeAngle(float a)
+            {
+                while (a > Math.PI) a -= 2 * (float)Math.PI;
+                while (a < -Math.PI) a += 2 * (float)Math.PI;
+                return a;
+            }
         }
-      }
-
-      return index;
     }
-
-    private float NormalizeAngle(float a)
-    {
-      while (a > Math.PI) a -= 2 * (float)Math.PI;
-      while (a < -Math.PI) a += 2 * (float)Math.PI;
-      return a;
-    }
-  }
 }
